@@ -2,18 +2,24 @@
 // useUserStore — Authenticated user state
 // =============================================================================
 
-import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { UserProfile } from '../types/user.types';
 import type { Session } from '@supabase/supabase-js';
+import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import type { UserProfile } from '../types/user.types';
 
 interface UserState {
+  /** Current user profile, null if not authenticated */
   profile: UserProfile | null;
+  /** The Supabase session object */
   session: Session | null;
+  /** Whether the user is authenticated (has a Supabase session) */
   isAuthenticated: boolean;
+  /** Whether the user has completed onboarding */
   isOnboarded: boolean;
+  /** Whether the user profile is currently loading */
   isLoading: boolean;
+  /** Whether the user has granted notification permissions */
   hasNotificationPermission: boolean;
 }
 
