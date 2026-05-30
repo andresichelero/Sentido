@@ -3,21 +3,17 @@
 // =============================================================================
 
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { UserProfile } from '../types/user.types';
 import type { Session } from '@supabase/supabase-js';
 
 interface UserState {
-  /** Current user profile, null if not authenticated */
   profile: UserProfile | null;
-  /** The Supabase session object */
   session: Session | null;
-  /** Whether the user is authenticated (has a Supabase session) */
   isAuthenticated: boolean;
-  /** Whether the user has completed onboarding */
   isOnboarded: boolean;
-  /** Whether the user profile is currently loading */
   isLoading: boolean;
-  /** Whether the user has granted notification permissions */
   hasNotificationPermission: boolean;
 }
 
@@ -31,48 +27,76 @@ interface UserActions {
   signOut: () => void;
 }
 
-export const useUserStore = create<UserState & UserActions>((set) => ({
-  // State
-  profile: null,
-  session: null,
-  isAuthenticated: false,
-  isOnboarded: false,
-  isLoading: true,
-  hasNotificationPermission: false,
-
-  // Actions
-  setSession: (session) =>
-    set({
-      session,
-      isAuthenticated: session !== null,
-    }),
-
-  setProfile: (profile) =>
-    set({
-      profile,
-      isOnboarded: profile?.onboardingCompleted ?? false,
-      isLoading: false,
-    }),
-
-  updateProfile: (updates) =>
-    set((state) => {
-      if (!state.profile) return state;
-      return { profile: { ...state.profile, ...updates } };
-    }),
-
-  setIsOnboarded: (value) => set({ isOnboarded: value }),
-
-  setIsLoading: (loading) => set({ isLoading: loading }),
-
-  setHasNotificationPermission: (value) => set({ hasNotificationPermission: value }),
-
-  signOut: () =>
-    set({
+export const useUserStore = create<UserState & UserActions>()(
+  persist(
+    (set) => ({
+      // State
       profile: null,
       session: null,
       isAuthenticated: false,
       isOnboarded: false,
-      isLoading: false,
+      isLoading: true,
       hasNotificationPermission: false,
+
+      // Actions
+      setSession: (session) =>
+        set({
+          session,
+          isAuthenticated: session !== null,
+        }),
+
+      setProfile: (profile) =>
+        set({
+          profile,
+          isOnboarded: profile?.onboardingCompleted ?? false,
+          isLoading: false,
+        }),
+
+      updateProfile: (updates) =>
+        set((state) => {
+          if (!state.profile) {
+            return {
+              profile: {
+                id: 'guest',
+                displayName: 'Convidado',
+                avatarUrl: null,
+                onboardingCompleted: state.isOnboarded,
+                notificationTimeMorning: null,
+                notificationTimeEvening: null,
+                preferredEntryMode: 'wheel',
+                plan: 'free',
+                createdAt: new Date(),
+                ...updates,
+              }
+            };
+          }
+          return { profile: { ...state.profile, ...updates } };
+        }),
+
+      setIsOnboarded: (value) => set({ isOnboarded: value }),
+
+      setIsLoading: (loading) => set({ isLoading: loading }),
+
+      setHasNotificationPermission: (value) => set({ hasNotificationPermission: value }),
+
+      signOut: () =>
+        set({
+          profile: null,
+          session: null,
+          isAuthenticated: false,
+          isOnboarded: false,
+          isLoading: false,
+          hasNotificationPermission: false,
+        }),
     }),
-}));
+    {
+      name: 'sentido-user-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({ 
+        profile: state.profile,
+        hasNotificationPermission: state.hasNotificationPermission,
+        isOnboarded: state.isOnboarded
+      }), // only persist these fields
+    }
+  )
+);

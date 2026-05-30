@@ -13,6 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { supabase } from '../../src/services/supabase/client';
+import { decode } from 'base64-arraybuffer';
 
 import { SafeArea } from '../../src/components/ui/SafeArea';
 import { Typography } from '../../src/components/ui/Typography';
@@ -150,12 +151,12 @@ export default function ProfileScreen() {
       const ext = img.uri.split('.').pop() || 'jpg';
       const path = `${session.user.id}/avatar-${Date.now()}.${ext}`;
 
-      const response = await fetch(img.uri);
-      const blob = await response.blob();
+      const base64 = await FileSystem.readAsStringAsync(img.uri, { encoding: 'base64' });
+      const arrayBuffer = decode(base64);
 
       const { error } = await supabase.storage
         .from('avatars')
-        .upload(path, blob, {
+        .upload(path, arrayBuffer, {
           contentType: `image/${ext}`,
           upsert: true,
         });

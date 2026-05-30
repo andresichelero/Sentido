@@ -1,17 +1,6 @@
 import { useAppStore } from '../../stores/useAppStore';
-
-let Audio: any = null;
-let InterruptionModeIOS: any = null;
-let InterruptionModeAndroid: any = null;
-
-try {
-  const expoAv = require('expo-av');
-  Audio = expoAv.Audio;
-  InterruptionModeIOS = expoAv.InterruptionModeIOS;
-  InterruptionModeAndroid = expoAv.InterruptionModeAndroid;
-} catch (e) {
-  // Silent catch: native module might not be available
-}
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import type { AudioPlayer, AudioStatus } from 'expo-audio';
 
 export type AudioPlaybackStatus = {
   isLoaded: boolean;
@@ -23,24 +12,21 @@ export type AudioPlaybackStatus = {
 export type StatusUpdateCallback = (status: AudioPlaybackStatus) => void;
 
 class AudioPlayerService {
-  private sound: any = null;
+  private player: AudioPlayer | null = null;
   private onStatusUpdate: StatusUpdateCallback | null = null;
   public currentAssetId: any = null;
+  private statusSubscription: any = null;
 
   constructor() {
     this.initMode();
   }
 
   private async initMode() {
-    if (!Audio) return;
     try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-        shouldDuckAndroid: true,
-        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-        playThroughEarpieceAndroid: false,
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        shouldPlayInBackground: false,
+        interruptionMode: 'doNotMix',
       });
     } catch (e) {
       console.warn('Failed to set audio mode', e);
@@ -49,55 +35,56 @@ class AudioPlayerService {
 
   async loadAndPlay(assetId: any, onStatusUpdate?: StatusUpdateCallback) {
     const { audioEnabled } = useAppStore.getState();
-    if (!audioEnabled || !Audio) return;
+    if (!audioEnabled) return;
 
     try {
-      // Unload previous if playing something else
       if (this.currentAssetId !== assetId) {
         await this.unload();
-      } else if (this.sound) {
-        // If it's the same asset, just play it
-        await this.sound.playAsync();
+      } else if (this.player) {
+        this.player.play();
         return;
       }
 
       this.currentAssetId = assetId;
       this.onStatusUpdate = onStatusUpdate || null;
 
-      const { sound } = await Audio.Sound.createAsync(
-        assetId,
-        { shouldPlay: true },
-        this.handlePlaybackStatusUpdate
-      );
-      this.sound = sound;
+      this.player = createAudioPlayer(assetId);
+      
+      this.statusSubscription = this.player.addListener('playbackStatusUpdate', this.handlePlaybackStatusUpdate);
+      this.player.play();
+      
     } catch (e) {
       console.error('Failed to load audio', e);
     }
   }
 
   async play() {
-    if (this.sound) {
-      await this.sound.playAsync();
+    if (this.player) {
+      this.player.play();
     }
   }
 
   async pause() {
-    if (this.sound) {
-      await this.sound.pauseAsync();
+    if (this.player) {
+      this.player.pause();
     }
   }
 
   async seek(positionMillis: number) {
-    if (this.sound) {
-      await this.sound.setPositionAsync(positionMillis);
+    if (this.player) {
+      // expo-audio uses seconds, expo-av used milliseconds
+      await this.player.seekTo(positionMillis / 1000);
     }
   }
 
   async unload() {
-    if (this.sound) {
-      this.sound.setOnPlaybackStatusUpdate(null);
-      await this.sound.unloadAsync();
-      this.sound = null;
+    if (this.statusSubscription) {
+      this.statusSubscription.remove();
+      this.statusSubscription = null;
+    }
+    if (this.player) {
+      this.player.remove();
+      this.player = null;
     }
     this.currentAssetId = null;
     if (this.onStatusUpdate) {
@@ -115,20 +102,21 @@ class AudioPlayerService {
     this.onStatusUpdate = callback;
   }
 
-  private handlePlaybackStatusUpdate = (status: any) => {
+  private handlePlaybackStatusUpdate = (status: AudioStatus) => {
     if (this.onStatusUpdate) {
-      if (status.isLoaded) {
+      if (status.status === 'ready' || status.status === 'playing' || status.status === 'paused') {
         this.onStatusUpdate({
           isLoaded: true,
-          isPlaying: status.isPlaying,
-          positionMillis: status.positionMillis,
-          durationMillis: status.durationMillis || 0,
+          isPlaying: status.playing,
+          // Convert seconds to milliseconds to keep backwards compatibility with expo-av components
+          positionMillis: status.currentTime * 1000,
+          durationMillis: status.duration * 1000,
         });
 
         // Auto pause when finished
-        if (status.didJustFinish) {
-          this.sound?.setPositionAsync(0);
-          this.sound?.pauseAsync();
+        if (status.currentTime > 0 && status.duration > 0 && status.currentTime >= status.duration) {
+          this.player?.seekTo(0);
+          this.player?.pause();
         }
       } else {
         this.onStatusUpdate({
@@ -143,3 +131,4 @@ class AudioPlayerService {
 }
 
 export const audioPlayerService = new AudioPlayerService();
+

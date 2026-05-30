@@ -15,7 +15,7 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import 'react-native-reanimated';
 import { router } from 'expo-router';
@@ -92,17 +92,16 @@ export default function RootLayout() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       
-      // Load onboarding state if not authenticated
-      if (!session) {
-        try {
-          const onboarded = await SecureStore.getItemAsync('has_completed_onboarding');
-          if (onboarded === 'true') {
-            useUserStore.getState().setIsOnboarded(true);
-          }
-        } catch (e) {
-          console.warn('Failed to load onboarding state', e);
+      // Always load onboarding state from local storage on launch
+      try {
+        const onboarded = await SecureStore.getItemAsync('has_completed_onboarding');
+        if (onboarded === 'true') {
+          useUserStore.getState().setIsOnboarded(true);
         }
+      } catch (e) {
+        console.warn('Failed to load onboarding state', e);
       }
+      
       setIsLoading(false);
     });
 
