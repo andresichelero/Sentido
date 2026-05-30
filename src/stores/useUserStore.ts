@@ -7,6 +7,7 @@ import type { Session } from '@supabase/supabase-js';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { UserProfile } from '../types/user.types';
+import { updateRemoteProfile } from '../services/supabase/profiles';
 
 interface UserState {
   /** Current user profile, null if not authenticated */
@@ -58,7 +59,7 @@ export const useUserStore = create<UserState & UserActions>()(
           isLoading: false,
         }),
 
-      updateProfile: (updates) =>
+      updateProfile: (updates) => {
         set((state) => {
           if (!state.profile) {
             return {
@@ -76,10 +77,24 @@ export const useUserStore = create<UserState & UserActions>()(
               }
             };
           }
+          
+          // Fire and forget remote update if authenticated
+          if (state.session?.user?.id && state.profile.id !== 'guest') {
+            updateRemoteProfile(state.session.user.id, updates).catch(console.error);
+          }
+          
           return { profile: { ...state.profile, ...updates } };
-        }),
+        });
+      },
 
-      setIsOnboarded: (value) => set({ isOnboarded: value }),
+      setIsOnboarded: (value) => {
+        set((state) => {
+          if (state.session?.user?.id) {
+             updateRemoteProfile(state.session.user.id, { onboardingCompleted: value }).catch(console.error);
+          }
+          return { isOnboarded: value };
+        });
+      },
 
       setIsLoading: (loading) => set({ isLoading: loading }),
 

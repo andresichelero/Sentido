@@ -67,14 +67,15 @@ export function useCheckin() {
    * Returns the saved check-in ID.
    */
   const finishCheckin = useCallback(async (): Promise<string | null> => {
-    if (!draft || draft.emotions.length === 0) {
+    const currentDraft = useEmotionStore.getState().draft;
+    if (!currentDraft || currentDraft.emotions.length === 0) {
       resetDraft();
       resetWheel();
       return null;
     }
 
     // Compute final valence and arousal from selected emotions
-    const emotionIds = draft.emotions.map((e) => e.emotionId);
+    const emotionIds = currentDraft.emotions.map((e) => e.emotionId);
     const valenceScore = calculateValenceScore(emotionIds);
     const arousalScore = calculateArousalScore(emotionIds);
 
@@ -83,15 +84,15 @@ export function useCheckin() {
     try {
       const saved = await checkinsLocalDb.createCheckin({
         userId,
-        checkedAt: draft.checkedAt,
-        emotions: draft.emotions,
-        context: draft.context,
-        note: draft.note,
-        entryMode: draft.entryMode,
+        checkedAt: currentDraft.checkedAt,
+        emotions: currentDraft.emotions,
+        context: currentDraft.context,
+        note: currentDraft.note,
+        entryMode: currentDraft.entryMode,
         valenceScore,
         arousalScore,
-        bodyRegions: draft.bodyRegions,
-        reflection: draft.reflection,
+        bodyRegions: currentDraft.bodyRegions,
+        reflection: currentDraft.reflection,
       });
 
       // Celebrate

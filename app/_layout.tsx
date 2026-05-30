@@ -24,6 +24,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as Linking from 'expo-linking';
 
 import { supabase } from '../src/services/supabase/client';
+import { fetchRemoteProfile } from '../src/services/supabase/profiles';
 import { useUserStore } from '../src/stores/useUserStore';
 import {
   syncPendingCheckins,
@@ -96,6 +97,17 @@ export default function RootLayout() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       
+      if (session?.user?.id) {
+        try {
+          const remoteProfile = await fetchRemoteProfile(session.user.id);
+          if (remoteProfile) {
+            useUserStore.getState().setProfile(remoteProfile);
+          }
+        } catch (e) {
+          console.warn('Failed to fetch remote profile on load', e);
+        }
+      }
+      
       // Always load onboarding state from local storage on launch
       try {
         const onboarded = await SecureStore.getItemAsync('has_completed_onboarding');
@@ -109,9 +121,18 @@ export default function RootLayout() {
       setIsLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session?.user?.id) {
+        try {
+          const remoteProfile = await fetchRemoteProfile(session.user.id);
+          if (remoteProfile) {
+            useUserStore.getState().setProfile(remoteProfile);
+          }
+        } catch (e) {
+          console.warn('Failed to fetch remote profile on auth change', e);
+        }
+
         migrateAnonymousCheckins(session.user.id).then(() => {
           pullRemoteCheckins().catch(console.error);
         });

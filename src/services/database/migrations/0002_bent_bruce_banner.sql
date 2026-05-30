@@ -1,0 +1,1 @@
+CREATE INDEX `local_checkins_user_date_idx` ON `local_checkins` (`user_id`,`checked_at`);

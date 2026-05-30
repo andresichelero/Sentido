@@ -22,7 +22,7 @@ const mapCheckin = (row: typeof localCheckins.$inferSelect): Checkin => ({
 });
 
 export const checkinsLocalDb = {
-  async createCheckin(draft: Omit<Checkin, 'id' | 'isSynced'>): Promise<Checkin> {
+  async createCheckin(draft: Omit<Checkin, 'id' | 'isSynced' | 'deletedAt'>): Promise<Checkin> {
     const id = crypto.randomUUID();
     const now = new Date();
     

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 
 
 
@@ -18,4 +18,8 @@ export const localCheckins = sqliteTable('local_checkins', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }),
   deletedAt: integer('deleted_at', { mode: 'timestamp' }),
+}, (table) => {
+  return {
+    userDateIdx: index('local_checkins_user_date_idx').on(table.userId, table.checkedAt),
+  };
 });

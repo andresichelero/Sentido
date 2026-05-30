@@ -24,8 +24,15 @@ expoDb.execSync(`
     reflection TEXT,
     sync_status TEXT DEFAULT 'pending' NOT NULL,
     created_at INTEGER NOT NULL,
-    updated_at INTEGER
+    updated_at INTEGER,
+    deleted_at INTEGER
   );
 `);
+
+try {
+  expoDb.execSync('ALTER TABLE local_checkins ADD COLUMN deleted_at INTEGER;');
+} catch (e) {
+  // Column already exists, ignore
+}
 
 export const db = drizzle(expoDb, { schema });
