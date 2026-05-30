@@ -9,19 +9,21 @@ import { localCheckins } from './schema';
 import { eq, inArray, desc } from 'drizzle-orm';
 import { Alert } from 'react-native';
 
-let isSyncing = false;
-let isPulling = false;
+let syncLockTime = 0;
+let pullLockTime = 0;
+const LOCK_TIMEOUT = 60000; // 1 minute
 
 /**
  * Attempts to push all pending local check-ins to Supabase in bulk.
  */
 export async function syncPendingCheckins(): Promise<void> {
-  if (isSyncing) return;
+  const now = Date.now();
+  if (now - syncLockTime < LOCK_TIMEOUT) return;
 
   const state = await NetInfo.fetch();
   if (!state.isConnected) return;
 
-  isSyncing = true;
+  syncLockTime = now;
   try {
     // Get all pending check-ins
     const pending = await db
@@ -30,7 +32,7 @@ export async function syncPendingCheckins(): Promise<void> {
       .where(eq(localCheckins.syncStatus, 'pending'));
 
     if (pending.length === 0) {
-      isSyncing = false;
+      syncLockTime = 0;
       return;
     }
 
@@ -38,7 +40,7 @@ export async function syncPendingCheckins(): Promise<void> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user?.id) {
       // Cannot sync if not authenticated (anonymous mode)
-      isSyncing = false;
+      syncLockTime = 0;
       return;
     }
 
@@ -57,6 +59,7 @@ export async function syncPendingCheckins(): Promise<void> {
       reflection: checkin.reflection,
       created_at: checkin.createdAt.toISOString(),
       updated_at: checkin.updatedAt?.toISOString() || new Date().toISOString(),
+      deleted_at: checkin.deletedAt ? checkin.deletedAt.toISOString() : null,
     }));
 
     // Bulk upsert to Supabase
@@ -80,7 +83,7 @@ export async function syncPendingCheckins(): Promise<void> {
     console.error('Error during synchronization:', error);
     Alert.alert('Erro de Sincronização', error.message || 'Falha ao enviar check-ins para a nuvem.');
   } finally {
-    isSyncing = false;
+    syncLockTime = 0;
   }
 }
 
@@ -89,16 +92,17 @@ export async function syncPendingCheckins(): Promise<void> {
  * Merges them into the local SQLite database.
  */
 export async function pullRemoteCheckins(): Promise<void> {
-  if (isPulling) return;
+  const now = Date.now();
+  if (now - pullLockTime < LOCK_TIMEOUT) return;
 
   const state = await NetInfo.fetch();
   if (!state.isConnected) return;
 
-  isPulling = true;
+  pullLockTime = now;
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user?.id) {
-      isPulling = false;
+      pullLockTime = 0;
       return;
     }
 
@@ -124,7 +128,7 @@ export async function pullRemoteCheckins(): Promise<void> {
     }
 
     if (!remoteData || remoteData.length === 0) {
-      isPulling = false;
+      pullLockTime = 0;
       return;
     }
 
@@ -145,6 +149,7 @@ export async function pullRemoteCheckins(): Promise<void> {
         syncStatus: 'synced' as const,
         createdAt: new Date(remote.created_at),
         updatedAt: new Date(remote.updated_at),
+        deletedAt: remote.deleted_at ? new Date(remote.deleted_at) : null,
       };
 
       await db.insert(localCheckins).values(localRecord).onConflictDoUpdate({
@@ -156,7 +161,7 @@ export async function pullRemoteCheckins(): Promise<void> {
   } catch (error) {
     console.error('Error during pulling remote data:', error);
   } finally {
-    isPulling = false;
+    pullLockTime = 0;
   }
 }
 

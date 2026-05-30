@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, lte } from 'drizzle-orm';
+import { eq, desc, and, gte, lte, isNull } from 'drizzle-orm';
 import { db } from './client';
 import { localCheckins } from './schema';
 import type { Checkin } from '../../types/checkin.types';
@@ -18,6 +18,7 @@ const mapCheckin = (row: typeof localCheckins.$inferSelect): Checkin => ({
   bodyRegions: (row.bodyRegions as any) ?? [],
   reflection: (row.reflection as any) ?? [],
   isSynced: row.syncStatus === 'synced',
+  deletedAt: row.deletedAt,
 });
 
 export const checkinsLocalDb = {
@@ -40,6 +41,7 @@ export const checkinsLocalDb = {
       syncStatus: 'pending',
       createdAt: now,
       updatedAt: now,
+      deletedAt: null,
     };
 
     await db.insert(localCheckins).values(newCheckin);
@@ -48,13 +50,19 @@ export const checkinsLocalDb = {
       ...draft,
       id,
       isSynced: false,
+      deletedAt: null,
     };
   },
 
   async getCheckins(userId: string, limit: number, offset: number): Promise<Checkin[]> {
     const rows = await db.select()
       .from(localCheckins)
-      .where(eq(localCheckins.userId, userId))
+      .where(
+        and(
+          eq(localCheckins.userId, userId),
+          isNull(localCheckins.deletedAt)
+        )
+      )
       .orderBy(desc(localCheckins.checkedAt))
       .limit(limit)
       .offset(offset);
@@ -79,7 +87,8 @@ export const checkinsLocalDb = {
         and(
           eq(localCheckins.userId, userId),
           gte(localCheckins.checkedAt, from),
-          lte(localCheckins.checkedAt, to)
+          lte(localCheckins.checkedAt, to),
+          isNull(localCheckins.deletedAt)
         )
       )
       .orderBy(desc(localCheckins.checkedAt));
@@ -113,20 +122,33 @@ export const checkinsLocalDb = {
   },
 
   async deleteCheckin(id: string): Promise<void> {
-    await db.delete(localCheckins).where(eq(localCheckins.id, id));
+    const now = new Date();
+    await db.update(localCheckins)
+      .set({ deletedAt: now, syncStatus: 'pending', updatedAt: now })
+      .where(eq(localCheckins.id, id));
   },
 
   async getTotalCheckins(userId: string): Promise<number> {
     const rows = await db.select()
       .from(localCheckins)
-      .where(eq(localCheckins.userId, userId));
+      .where(
+        and(
+          eq(localCheckins.userId, userId),
+          isNull(localCheckins.deletedAt)
+        )
+      );
     return rows.length;
   },
 
   async getUserStreak(userId: string): Promise<number> {
     const rows = await db.select()
       .from(localCheckins)
-      .where(eq(localCheckins.userId, userId))
+      .where(
+        and(
+          eq(localCheckins.userId, userId),
+          isNull(localCheckins.deletedAt)
+        )
+      )
       .orderBy(desc(localCheckins.checkedAt));
       
     if (rows.length === 0) return 0;

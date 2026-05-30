@@ -25,9 +25,9 @@ import {
 } from '../../src/hooks/useEmotionHistory';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { spacing } from '../../src/theme/spacing';
-import { getEmotionById } from '../../src/utils/emotion-math';
 import { checkinsLocalDb } from '../../src/services/database/checkins';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSettingsStore } from '../../src/stores/useSettingsStore';
 
 function SectionTitle({ title }: { title: string }) {
   const colors = useThemeColors();
@@ -44,6 +44,7 @@ function SectionTitle({ title }: { title: string }) {
 
 export default function HistoryScreen() {
   const colors = useThemeColors();
+  const language = useSettingsStore((s) => s.language);
   const [pieRange, setPieRange] = useState<7 | 30>(7);
 
   // Data hooks
@@ -60,7 +61,7 @@ export default function HistoryScreen() {
     () =>
       (frequencyData ?? []).map((f) => ({
         emotionId: f.emotionId,
-        label: f.emotion?.name ?? f.emotionId,
+        label: (language === 'en-US' ? f.emotion?.nameEn : f.emotion?.name) ?? f.emotionId,
         count: f.count,
         color: f.emotion?.color ?? '#818CF8',
       })),
@@ -71,12 +72,12 @@ export default function HistoryScreen() {
 
   const handleDeleteCheckin = useCallback((id: string) => {
     Alert.alert(
-      'Deletar Registro',
-      'Tem certeza que deseja deletar este registro de emoção? Esta ação não pode ser desfeita.',
+      language === 'en-US' ? 'Delete Entry' : 'Deletar Registro',
+      language === 'en-US' ? 'Are you sure you want to delete this emotion entry? This action cannot be undone.' : 'Tem certeza que deseja deletar este registro de emoção? Esta ação não pode ser desfeita.',
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: language === 'en-US' ? 'Cancel' : 'Cancelar', style: 'cancel' },
         {
-          text: 'Deletar',
+          text: language === 'en-US' ? 'Delete' : 'Deletar',
           style: 'destructive',
           onPress: async () => {
             try {
@@ -89,29 +90,29 @@ export default function HistoryScreen() {
         },
       ]
     );
-  }, [queryClient]);
+  }, [queryClient, language]);
 
   const valenceLabel = useMemo(() => {
     if (!summary) return '—';
     const v = summary.averageValence;
-    if (v > 2) return 'Positiva ↑';
-    if (v > 0) return 'Levemente +';
-    if (v > -2) return 'Levemente −';
-    return 'Negativa ↓';
-  }, [summary]);
+    if (v > 2) return language === 'en-US' ? 'Positive ↑' : 'Positiva ↑';
+    if (v > 0) return language === 'en-US' ? 'Slightly +' : 'Levemente +';
+    if (v > -2) return language === 'en-US' ? 'Slightly −' : 'Levemente −';
+    return language === 'en-US' ? 'Negative ↓' : 'Negativa ↓';
+  }, [summary, language]);
 
   const renderHeader = () => (
     <View style={styles.headerContent}>
-      <Typography variant="display-md">Histórico</Typography>
+      <Typography variant="display-md">{language === 'en-US' ? 'History' : 'Histórico'}</Typography>
       <Spacer height={spacing.xs} />
       <Typography variant="body-md" color={colors.textSecondary}>
-        Seus registros emocionais
+        {language === 'en-US' ? 'Your emotional entries' : 'Seus registros emocionais'}
       </Typography>
 
       <Spacer height={spacing.lg} />
 
       {/* 1. Weekly Summary */}
-      <SectionTitle title="ESTA SEMANA" />
+      <SectionTitle title={language === 'en-US' ? "THIS WEEK" : "ESTA SEMANA"} />
       {isLoading ? (
         <View style={styles.metricsRow}>
           <Skeleton height={80} style={{ flex: 1 }} />
@@ -141,10 +142,10 @@ export default function HistoryScreen() {
               ]}
             />
             <Typography variant="heading-sm" numberOfLines={1}>
-              {summary?.dominantEmotion?.name ?? '—'}
+              {language === 'en-US' ? summary?.dominantEmotion?.nameEn : summary?.dominantEmotion?.name ?? '—'}
             </Typography>
             <Typography variant="label-sm" color={colors.textTertiary}>
-              dominante
+              {language === 'en-US' ? 'dominant' : 'dominante'}
             </Typography>
           </Card>
 
@@ -152,7 +153,7 @@ export default function HistoryScreen() {
             <Feather name="activity" size={18} color={colors.activeEmotionColor} />
             <Typography variant="heading-sm">{valenceLabel}</Typography>
             <Typography variant="label-sm" color={colors.textTertiary}>
-              valência
+              {language === 'en-US' ? 'valence' : 'valência'}
             </Typography>
           </Card>
         </View>
@@ -161,7 +162,7 @@ export default function HistoryScreen() {
       <Spacer height={spacing.xl} />
 
       {/* 2. Heatmap Calendar */}
-      <SectionTitle title="ÚLTIMOS 90 DIAS" />
+      <SectionTitle title={language === 'en-US' ? "LAST 90 DAYS" : "ÚLTIMOS 90 DIAS"} />
       {isLoading ? (
         <Skeleton height={140} />
       ) : (
@@ -174,7 +175,7 @@ export default function HistoryScreen() {
 
       {/* 3. Emotion Pie Chart */}
       <View style={styles.sectionHeader}>
-        <SectionTitle title="DISTRIBUIÇÃO" />
+        <SectionTitle title={language === 'en-US' ? "DISTRIBUTION" : "DISTRIBUIÇÃO"} />
         <View style={styles.toggleRow}>
           <Pressable
             onPress={() => setPieRange(7)}
@@ -184,7 +185,7 @@ export default function HistoryScreen() {
             ]}
           >
             <Typography variant="label-sm" color={pieRange === 7 ? '#FFFFFF' : colors.textSecondary}>
-              Semana
+              {language === 'en-US' ? "Week" : "Semana"}
             </Typography>
           </Pressable>
           <Pressable
@@ -195,7 +196,7 @@ export default function HistoryScreen() {
             ]}
           >
             <Typography variant="label-sm" color={pieRange === 30 ? '#FFFFFF' : colors.textSecondary}>
-              Mês
+              {language === 'en-US' ? "Month" : "Mês"}
             </Typography>
           </Pressable>
         </View>
@@ -209,7 +210,7 @@ export default function HistoryScreen() {
       <Spacer height={spacing.xl} />
 
       {/* 4. Scatter Plot */}
-      <SectionTitle title="MAPA VALÊNCIA × ATIVAÇÃO" />
+      <SectionTitle title={language === 'en-US' ? "VALENCE × AROUSAL MAP" : "MAPA VALÊNCIA × ATIVAÇÃO"} />
       {isLoading ? (
         <Skeleton height={250} />
       ) : (
@@ -219,14 +220,14 @@ export default function HistoryScreen() {
       <Spacer height={spacing.xl} />
 
       {/* 5. Recent List Header */}
-      <SectionTitle title="RECENTES" />
+      <SectionTitle title={language === 'en-US' ? "RECENT" : "RECENTES"} />
       {!isLoading && (recentCheckins ?? []).length === 0 && (
         <Card>
           <View style={styles.emptyRecent}>
             <Feather name="inbox" size={32} color={colors.textTertiary} />
             <Spacer height={spacing.sm} />
             <Typography variant="body-sm" color={colors.textTertiary} center>
-              Nenhum check-in registrado ainda.{'\n'}Use a roda para começar!
+              {language === 'en-US' ? 'No check-ins recorded yet.\nUse the wheel to start!' : 'Nenhum check-in registrado ainda.\nUse a roda para começar!'}
             </Typography>
           </View>
         </Card>

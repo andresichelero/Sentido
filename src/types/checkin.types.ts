@@ -55,10 +55,12 @@ export interface Checkin {
   reflection: CheckinReflection[];
   /** Whether this check-in has been synced to Supabase */
   isSynced: boolean;
+  /** When this check-in was deleted (soft delete) */
+  deletedAt: Date | null;
 }
 
 /** Draft check-in used during creation (before saving) */
-export type CheckinDraft = Omit<Checkin, 'id' | 'userId' | 'isSynced'>;
+export type CheckinDraft = Omit<Checkin, 'id' | 'userId' | 'isSynced' | 'deletedAt'>;
 
 /** Steps in the check-in flow */
 export type CheckinStep = 'entry' | 'emotions' | 'context' | 'note' | 'reflection' | 'complete';

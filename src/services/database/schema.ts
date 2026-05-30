@@ -17,4 +17,5 @@ export const localCheckins = sqliteTable('local_checkins', {
   syncStatus: text('sync_status', { enum: ['pending', 'synced', 'conflict'] }).default('pending').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }),
+  deletedAt: integer('deleted_at', { mode: 'timestamp' }),
 });

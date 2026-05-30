@@ -3,8 +3,8 @@
 // FASE 5: Full check-in flow with bottom sheet and floating CTA
 // =============================================================================
 
-import React, { useCallback, useEffect } from 'react';
-import { View, StyleSheet, Pressable, Dimensions } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, StyleSheet, Pressable, Dimensions, Alert } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -31,6 +31,7 @@ import { useEmotionStore } from '../../src/stores/useEmotionStore';
 import { spacing } from '../../src/theme/spacing';
 import { spring as springConfig } from '../../src/theme/motion';
 import { EmotionSheet } from '../../src/components/emotion/EmotionSheet';
+import { ContextSheet } from '../../src/components/checkin/ContextSheet';
 import { AuraBackground } from '../../src/components/ui/AuraBackground';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -74,16 +75,25 @@ export default function CheckinScreen() {
 
   // Sheet open state derived from wheel selection
   const isSheetOpen = selectedEmotionId !== null;
+  const [isContextSheetOpen, setIsContextSheetOpen] = useState(false);
 
   const handleCloseSheet = useCallback(() => {
     selectEmotion(null);
   }, [selectEmotion]);
 
-  const handleFinishCheckin = useCallback(async () => {
+  const handlePreFinishCheckin = useCallback(() => {
+    if (!canFinish) {
+      Alert.alert('Atenção', 'Ajuste a intensidade de todas as emoções registradas (maior que 0) antes de continuar.');
+      return;
+    }
+    setIsContextSheetOpen(true);
+  }, [canFinish]);
+
+  const handleFinalFinish = useCallback(async () => {
+    setIsContextSheetOpen(false);
     const id = await finishCheckin();
     if (id) {
       // Check-in saved successfully — draft and wheel already reset by the hook
-      // Could navigate to a celebration screen in the future
     }
   }, [finishCheckin]);
 
@@ -129,9 +139,10 @@ export default function CheckinScreen() {
 
   // Floating CTA animation
   const ctaScale = useSharedValue(0);
+  const showCta = draft && draft.emotions.length > 0 && entryMode !== 'body';
   useEffect(() => {
-    ctaScale.value = withSpring(canFinish ? 1 : 0, springConfig.default);
-  }, [canFinish, ctaScale]);
+    ctaScale.value = withSpring(showCta ? 1 : 0, springConfig.default);
+  }, [showCta, ctaScale]);
 
   const ctaAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: ctaScale.value }],
@@ -272,14 +283,14 @@ export default function CheckinScreen() {
         </Animated.View>
 
         {/* Floating "Concluir check-in" CTA */}
-        {canFinish && entryMode !== 'body' && (
+        {showCta && (
           <Animated.View style={[styles.floatingCta, ctaAnimatedStyle]}>
             <Button
               label={`Concluir check-in (${emotionCount})`}
-              variant="primary"
+              variant={canFinish ? 'primary' : 'secondary'}
               size="lg"
               fullWidth
-              onPress={handleFinishCheckin}
+              onPress={handlePreFinishCheckin}
             />
           </Animated.View>
         )}
@@ -289,6 +300,12 @@ export default function CheckinScreen() {
           isOpen={isSheetOpen}
           onClose={handleCloseSheet}
           emotionId={selectedEmotionId}
+        />
+        
+        <ContextSheet
+          isOpen={isContextSheetOpen}
+          onClose={() => setIsContextSheetOpen(false)}
+          onFinish={handleFinalFinish}
         />
       </View>
     </SafeArea>
