@@ -13,7 +13,7 @@ export const localCheckins = sqliteTable('local_checkins', {
   userId: text('user_id').notNull(),
   checkedAt: integer('checked_at', { mode: 'timestamp' }).notNull(),
   emotions: text('emotions', { mode: 'json' }).notNull(), // Array of CheckinEmotion
-  context: text('context'),
+  context: text('context', { mode: 'json' }),
   note: text('note'),
   entryMode: text('entry_mode').notNull(),
   valenceScore: integer('valence_score'),

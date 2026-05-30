@@ -10,12 +10,10 @@ import { useUserStore } from '../stores/useUserStore';
 import { useHaptics } from './useHaptics';
 import { checkinsLocalDb } from '../services/database/checkins';
 import { syncPendingCheckins } from '../services/database/sync';
-import {
-  calculateValenceScore,
-  calculateArousalScore,
-  getEmotionById,
-} from '../utils/emotion-math';
+import { calculateValenceScore, calculateArousalScore, getEmotionById } from '../utils/emotion-math';
 import type { EntryMode } from '../types/checkin.types';
+import { useQueryClient } from '@tanstack/react-query';
+import { Alert } from 'react-native';
 
 /**
  * Hook that orchestrates the check-in lifecycle:
@@ -29,6 +27,7 @@ export function useCheckin() {
   const resetWheel = useWheelStore((s) => s.resetWheel);
   const session = useUserStore((s) => s.session);
   const { mediumImpact, successNotification } = useHaptics();
+  const queryClient = useQueryClient();
 
   /** Start a new check-in draft */
   const startCheckin = useCallback(
@@ -102,12 +101,16 @@ export function useCheckin() {
       resetDraft();
       resetWheel();
 
+      // Invalidate history query so UI updates immediately
+      queryClient.invalidateQueries({ queryKey: ['checkins'] });
+
       // Fire and forget sync to Supabase
       syncPendingCheckins().catch(console.error);
 
       return saved.id;
-    } catch (error) {
+    } catch (error: any) {
       console.error('[useCheckin] Failed to save check-in:', error);
+      Alert.alert('Erro ao salvar', `Ocorreu um problema ao salvar seu check-in no banco local: ${error.message || 'Erro desconhecido'}`);
       return null;
     }
   }, [draft, resetDraft, resetWheel, successNotification, session]);

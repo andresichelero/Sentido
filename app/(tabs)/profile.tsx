@@ -82,9 +82,14 @@ export default function ProfileScreen() {
   });
 
   const handleResetOnboarding = async () => {
-    await SecureStore.deleteItemAsync('has_completed_onboarding');
-    setIsOnboarded(false);
-    router.replace('/onboarding/welcome');
+    try {
+      await SecureStore.deleteItemAsync('has_completed_onboarding');
+      setIsOnboarded(false);
+      router.replace('/onboarding/welcome');
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert('Erro', error.message || 'Falha ao resetar o onboarding.');
+    }
   };
 
   const handleExportData = async () => {
@@ -102,9 +107,9 @@ export default function ProfileScreen() {
       } else {
         Alert.alert('Erro', 'O compartilhamento não está disponível no seu dispositivo.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to export data', error);
-      Alert.alert('Erro', 'Ocorreu um erro ao exportar os dados.');
+      Alert.alert('Erro', error.message || 'Ocorreu um erro ao exportar os dados.');
     }
   };
 
@@ -170,9 +175,9 @@ export default function ProfileScreen() {
       // Update the user record in Supabase
       await supabase.from('users').update({ avatar_url: publicUrlData.publicUrl }).eq('id', session.user.id);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      Alert.alert('Erro', 'Não foi possível atualizar a foto de perfil.');
+      Alert.alert('Erro', error.message || 'Não foi possível atualizar a foto de perfil.');
     } finally {
       setIsUploading(false);
     }

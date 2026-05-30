@@ -7,6 +7,7 @@ import { supabase } from '../supabase/client';
 import { db } from './client';
 import { localCheckins } from './schema';
 import { eq } from 'drizzle-orm';
+import { Alert } from 'react-native';
 
 let isSyncing = false;
 
@@ -102,8 +103,9 @@ export async function syncPendingCheckins(): Promise<void> {
           .where(eq(localCheckins.id, checkin.id));
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error during synchronization:', error);
+    Alert.alert('Erro de Sincronização', error.message || 'Falha ao enviar check-ins para a nuvem.');
   } finally {
     isSyncing = false;
   }

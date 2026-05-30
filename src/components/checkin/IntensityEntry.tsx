@@ -9,6 +9,7 @@ import { Typography } from '../ui/Typography';
 import { Spacer } from '../ui/Spacer';
 import { Button } from '../ui/Button';
 import { useEmotionStore } from '../../stores/useEmotionStore';
+import { useWheelStore } from '../../stores/useWheelStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useThemeColors } from '../../hooks/useThemeColors';
 import { spacing, radii } from '../../theme/spacing';
@@ -33,6 +34,7 @@ export function IntensityEntry() {
   const setIntensity = useEmotionStore((s) => s.setIntensity);
   const setEntryMode = useEmotionStore((s) => s.setEntryMode);
   const resetDraft = useEmotionStore((s) => s.resetDraft);
+  const resetWheel = useWheelStore((s) => s.resetWheel);
   const colors = useThemeColors();
   const language = useSettingsStore((s) => s.language);
 
@@ -126,7 +128,10 @@ export function IntensityEntry() {
           label="Cancelar"
           variant="ghost"
           size="sm"
-          onPress={() => resetDraft()}
+          onPress={() => {
+            resetDraft();
+            resetWheel();
+          }}
         />
       </View>
     </ScrollView>

@@ -272,7 +272,7 @@ export default function CheckinScreen() {
         </Animated.View>
 
         {/* Floating "Concluir check-in" CTA */}
-        {canFinish && (
+        {canFinish && entryMode !== 'body' && (
           <Animated.View style={[styles.floatingCta, ctaAnimatedStyle]}>
             <Button
               label={`Concluir check-in (${emotionCount})`}

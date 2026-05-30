@@ -3,7 +3,7 @@
 // Spec section 11.6
 // =============================================================================
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Typography } from '../ui/Typography';
 import { Spacer } from '../ui/Spacer';
@@ -19,6 +19,7 @@ import { spacing } from '../../theme/spacing';
 export function BodyMapEntry() {
   const colors = useThemeColors();
   const setEntryMode = useEmotionStore((s) => s.setEntryMode);
+  const draft = useEmotionStore((s) => s.draft);
   const language = useSettingsStore((s) => s.language);
   
   const {
@@ -36,6 +37,12 @@ export function BodyMapEntry() {
     confirmSelection();
     setEntryMode('intensity');
   };
+
+  useEffect(() => {
+    if (!draft) {
+      clearRegions();
+    }
+  }, [draft, clearRegions]);
 
   return (
     <View style={styles.container}>

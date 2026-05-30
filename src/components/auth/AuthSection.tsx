@@ -56,8 +56,9 @@ export function AuthSection({ isAuthenticated, email }: AuthSectionProps) {
           onPress: async () => {
             try {
               await signOut();
-            } catch (error) {
+            } catch (error: any) {
               console.error('SignOut error', error);
+              Alert.alert('Erro ao Sair', error.message || 'Não foi possível desconectar a conta.');
             }
           }
         }

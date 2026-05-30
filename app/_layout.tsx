@@ -117,7 +117,8 @@ export default function RootLayout() {
           // Check for PKCE code flow
           const code = urlObj.searchParams.get('code');
           if (code) {
-            await supabase.auth.exchangeCodeForSession(code);
+            const { error } = await supabase.auth.exchangeCodeForSession(code);
+            if (error) throw error;
             return;
           }
           // Check for Implicit flow (hash fragment)
@@ -156,6 +157,18 @@ export default function RootLayout() {
     });
 
     return () => unsubscribe();
+  }, []);
+
+  // Notification interaction listener
+  useEffect(() => {
+    if (!Notifications) return;
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(() => {
+      // Navigate to the check-in screen (root) when user taps a notification
+      router.navigate('/(tabs)');
+    });
+
+    return () => subscription.remove();
   }, []);
 
   // Initial Routing & Splash Screen
