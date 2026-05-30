@@ -14,6 +14,7 @@ import { Spacer } from '../../src/components/ui/Spacer';
 import { EmotionWheel } from '../../src/components/emotion/wheel/EmotionWheel';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { spacing } from '../../src/theme/spacing';
+import { completeOnboarding } from '../../src/utils/onboarding';
 
 export default function IntroWheelScreen() {
   const colors = useThemeColors();
@@ -81,7 +82,7 @@ export default function IntroWheelScreen() {
           <Spacer height={spacing.md} />
           <Pressable
             style={styles.buttonSecondary}
-            onPress={() => router.push('/onboarding/first-checkin' as any)}
+            onPress={completeOnboarding}
           >
             <Typography variant="label-md" color={colors.textTertiary}>
               Pular

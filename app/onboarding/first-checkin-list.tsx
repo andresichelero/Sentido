@@ -11,6 +11,7 @@ import { useCheckin } from '../../src/hooks/useCheckin';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { spacing } from '../../src/theme/spacing';
 import type { EmotionNode } from '../../src/types/emotion.types';
+import { completeOnboarding } from '../../src/utils/onboarding';
 
 export default function FirstCheckinListScreen() {
   const colors = useThemeColors();
@@ -54,6 +55,10 @@ export default function FirstCheckinListScreen() {
   };
 
   const handleContinue = () => {
+    if (selectedSubIds.size === 0) {
+      completeOnboarding();
+      return;
+    }
     // Add all selected sub-emotions to the draft
     selectedSubIds.forEach((id) => {
       addEmotion(id, 5);

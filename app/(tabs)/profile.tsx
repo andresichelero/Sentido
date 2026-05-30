@@ -10,6 +10,9 @@ import * as Sharing from 'expo-sharing';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
+import { supabase } from '../../src/services/supabase/client';
 
 import { SafeArea } from '../../src/components/ui/SafeArea';
 import { Typography } from '../../src/components/ui/Typography';
@@ -30,6 +33,7 @@ import { AuthSection } from '../../src/components/auth/AuthSection';
 
 export default function ProfileScreen() {
   const colors = useThemeColors();
+  const [isUploading, setIsUploading] = useState(false);
   
   // Stores
   const setIsOnboarded = useUserStore((s) => s.setIsOnboarded);
@@ -128,6 +132,51 @@ export default function ProfileScreen() {
     }
   };
 
+  const handlePickAvatar = async () => {
+    if (!isAuthenticated || !session?.user?.id) return;
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets[0]) return;
+
+      setIsUploading(true);
+      const img = result.assets[0];
+      const ext = img.uri.split('.').pop() || 'jpg';
+      const path = `${session.user.id}/avatar-${Date.now()}.${ext}`;
+
+      const response = await fetch(img.uri);
+      const blob = await response.blob();
+
+      const { error } = await supabase.storage
+        .from('avatars')
+        .upload(path, blob, {
+          contentType: `image/${ext}`,
+          upsert: true,
+        });
+
+      if (error) throw error;
+
+      const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(path);
+
+      updateProfile({ avatarUrl: publicUrlData.publicUrl });
+      
+      // Update the user record in Supabase
+      await supabase.from('users').update({ avatar_url: publicUrlData.publicUrl }).eq('id', session.user.id);
+
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Erro', 'Não foi possível atualizar a foto de perfil.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const onMorningChange = async (event: DateTimePickerEvent, selectedDate?: Date) => {
     setShowMorningPicker(Platform.OS === 'ios');
     if (selectedDate) {
@@ -161,9 +210,30 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         {/* Header (Avatar and Name) */}
         <View style={styles.header}>
-          <View style={[styles.avatar, { backgroundColor: colors.surface2 }]}>
-            <Feather name="user" size={32} color={colors.textSecondary} />
-          </View>
+          <Pressable 
+            onPress={handlePickAvatar} 
+            disabled={!isAuthenticated || isUploading}
+            style={[styles.avatar, { backgroundColor: colors.surface2 }]}
+          >
+            {profile?.avatarUrl ? (
+              <Image 
+                source={{ uri: profile.avatarUrl }} 
+                style={{ width: 80, height: 80, borderRadius: 40 }} 
+              />
+            ) : (
+              <Feather name="user" size={32} color={colors.textSecondary} />
+            )}
+            {isAuthenticated && !isUploading && (
+              <View style={styles.editBadge}>
+                <Feather name="camera" size={12} color="#FFF" />
+              </View>
+            )}
+            {isUploading && (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 40, alignItems: 'center', justifyContent: 'center' }]}>
+                <Feather name="loader" size={20} color="#FFF" />
+              </View>
+            )}
+          </Pressable>
           <Typography variant="heading-lg">Você</Typography>
           <Typography variant="body-sm" color={colors.textTertiary}>
             {isAuthenticated ? 'Conta Sincronizada' : 'Conta Local'}
@@ -341,6 +411,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xs,
+  },
+  editBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#6366F1', // Accent color
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#000',
   },
   statsRow: {
     flexDirection: 'row',

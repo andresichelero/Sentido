@@ -17,6 +17,7 @@ import { EMOTIONS } from '../../src/data/emotions';
 import { useCheckin } from '../../src/hooks/useCheckin';
 import { useThemeColors } from '../../src/hooks/useThemeColors';
 import { spacing } from '../../src/theme/spacing';
+import { completeOnboarding } from '../../src/utils/onboarding';
 
 const { width } = Dimensions.get('window');
 const WHEEL_RADIUS = width * 0.35;
@@ -222,7 +223,7 @@ export default function FirstCheckinScreen() {
           ) : (
             <Pressable
               style={styles.skipButton}
-              onPress={() => router.push('/onboarding/first-checkin-list' as any)}
+              onPress={completeOnboarding}
             >
               <Typography variant="label-md" color={colors.textTertiary}>
                 Pular
