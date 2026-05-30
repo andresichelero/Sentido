@@ -7,6 +7,7 @@ import { supabase } from '../supabase/client';
 import { db } from './client';
 import { localCheckins } from './schema';
 import { eq, inArray, desc } from 'drizzle-orm';
+import { Alert } from 'react-native';
 
 let isSyncing = false;
 let isPulling = false;
@@ -22,6 +23,7 @@ export async function syncPendingCheckins(): Promise<void> {
 
   isSyncing = true;
   try {
+    // Get all pending check-ins
     const pending = await db
       .select()
       .from(localCheckins)
@@ -32,8 +34,10 @@ export async function syncPendingCheckins(): Promise<void> {
       return;
     }
 
+    // Verify authentication
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user?.id) {
+      // Cannot sync if not authenticated (anonymous mode)
       isSyncing = false;
       return;
     }
@@ -74,6 +78,7 @@ export async function syncPendingCheckins(): Promise<void> {
 
   } catch (error: any) {
     console.error('Error during synchronization:', error);
+    Alert.alert('Erro de Sincronização', error.message || 'Falha ao enviar check-ins para a nuvem.');
   } finally {
     isSyncing = false;
   }
