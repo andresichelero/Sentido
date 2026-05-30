@@ -116,6 +116,10 @@ sentido/
 └── supabase/             # SQL Migrations and Auth config
 ```
 
+## 🙏 Acknowledgments
+
+*   **Anatomical SVG Paths**: The high-fidelity SVG paths used in the interactive Body Map (Sentido's Heatmap) were extracted and adapted from the excellent open-source project [vulovix/body-muscles](https://github.com/vulovix/body-muscles) (see demo: [vulovix.github.io/body-muscles](https://vulovix.github.io/body-muscles/)). Their meticulously mapped anatomical vectors serve as the foundational rendering engine for our UI's hit-testing and aura effects.
+
 ## 🤝 Contributing
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
