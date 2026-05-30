@@ -6,14 +6,13 @@ import NetInfo from '@react-native-community/netinfo';
 import { supabase } from '../supabase/client';
 import { db } from './client';
 import { localCheckins } from './schema';
-import { eq } from 'drizzle-orm';
-import { Alert } from 'react-native';
+import { eq, inArray, desc } from 'drizzle-orm';
 
 let isSyncing = false;
+let isPulling = false;
 
 /**
- * Attempts to push all pending local check-ins to Supabase.
- * Should be called when network connectivity is restored or when a new check-in is created.
+ * Attempts to push all pending local check-ins to Supabase in bulk.
  */
 export async function syncPendingCheckins(): Promise<void> {
   if (isSyncing) return;
@@ -23,7 +22,6 @@ export async function syncPendingCheckins(): Promise<void> {
 
   isSyncing = true;
   try {
-    // Get all pending check-ins
     const pending = await db
       .select()
       .from(localCheckins)
@@ -34,78 +32,48 @@ export async function syncPendingCheckins(): Promise<void> {
       return;
     }
 
-    // Verify authentication
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user?.id) {
-      // Cannot sync if not authenticated (anonymous mode)
       isSyncing = false;
       return;
     }
 
-    // Process each pending check-in
-    for (const checkin of pending) {
-      // Map local to remote schema
-      const remoteCheckin = {
-        id: checkin.id,
-        user_id: checkin.userId,
-        checked_at: checkin.checkedAt.toISOString(),
-        emotions: checkin.emotions,
-        context: checkin.context,
-        note: checkin.note,
-        entry_mode: checkin.entryMode,
-        valence_score: checkin.valenceScore,
-        arousal_score: checkin.arousalScore,
-        body_regions: checkin.bodyRegions,
-        reflection: checkin.reflection,
-        created_at: checkin.createdAt.toISOString(),
-        updated_at: checkin.updatedAt?.toISOString() || new Date().toISOString(),
-      };
+    // Map local to remote schema
+    const remoteCheckins = pending.map((checkin) => ({
+      id: checkin.id,
+      user_id: checkin.userId,
+      checked_at: checkin.checkedAt.toISOString(),
+      emotions: checkin.emotions,
+      context: checkin.context,
+      note: checkin.note,
+      entry_mode: checkin.entryMode,
+      valence_score: checkin.valenceScore,
+      arousal_score: checkin.arousalScore,
+      body_regions: checkin.bodyRegions,
+      reflection: checkin.reflection,
+      created_at: checkin.createdAt.toISOString(),
+      updated_at: checkin.updatedAt?.toISOString() || new Date().toISOString(),
+    }));
 
-      // Fetch remote to check for conflicts
-      const { data: remoteData, error: fetchError } = await supabase
-        .from('checkins')
-        .select('updated_at')
-        .eq('id', checkin.id)
-        .single();
+    // Bulk upsert to Supabase
+    const { error } = await supabase
+      .from('checkins')
+      .upsert(remoteCheckins, { onConflict: 'id' });
 
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        // PGRST116 means zero rows, which is fine for a new insert
-        console.error(`Failed to fetch remote check-in ${checkin.id}:`, fetchError);
-        continue;
-      }
-
-      if (remoteData?.updated_at) {
-        const remoteDate = new Date(remoteData.updated_at);
-        const localDate = new Date(remoteCheckin.updated_at);
-        if (remoteDate > localDate) {
-          // Remote is newer, mark local as synced to stop retrying,
-          // ideally we'd pull the remote state here (conflict resolution).
-          await db
-            .update(localCheckins)
-            .set({ syncStatus: 'synced' })
-            .where(eq(localCheckins.id, checkin.id));
-          continue;
-        }
-      }
-
-      const { error } = await supabase
-        .from('checkins')
-        .upsert(remoteCheckin, { onConflict: 'id' });
-
-      if (error) {
-        console.error(`Failed to sync check-in ${checkin.id}:`, error);
-        // We leave it as 'pending' to retry later
-      } else {
-        // Mark as synced locally
-        await db
-          .update(localCheckins)
-          .set({ syncStatus: 'synced' })
-          .where(eq(localCheckins.id, checkin.id));
-      }
+    if (error) {
+      console.error('Failed to bulk sync check-ins:', error);
+      throw error;
     }
+
+    // Mark as synced locally
+    const pendingIds = pending.map((p) => p.id);
+    await db
+      .update(localCheckins)
+      .set({ syncStatus: 'synced' })
+      .where(inArray(localCheckins.id, pendingIds));
+
   } catch (error: any) {
     console.error('Error during synchronization:', error);
-    Alert.alert('Erro de Sincronização', error.message || 'Falha ao enviar check-ins para a nuvem.');
   } finally {
     isSyncing = false;
   }
@@ -113,8 +81,104 @@ export async function syncPendingCheckins(): Promise<void> {
 
 /**
  * Pulls new check-ins from Supabase that might have been created on another device.
- * (Optional for offline-first, but good for multi-device sync).
+ * Merges them into the local SQLite database.
  */
 export async function pullRemoteCheckins(): Promise<void> {
-  // To be implemented as needed.
+  if (isPulling) return;
+
+  const state = await NetInfo.fetch();
+  if (!state.isConnected) return;
+
+  isPulling = true;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user?.id) {
+      isPulling = false;
+      return;
+    }
+
+    // Fetch the most recent updated_at from local db
+    const latestLocal = await db
+      .select()
+      .from(localCheckins)
+      .orderBy(desc(localCheckins.updatedAt))
+      .limit(1);
+
+    let query = supabase.from('checkins').select('*').eq('user_id', session.user.id);
+
+    // If we have local records, only pull newer ones
+    if (latestLocal.length > 0 && latestLocal[0].updatedAt) {
+      query = query.gt('updated_at', latestLocal[0].updatedAt.toISOString());
+    }
+
+    const { data: remoteData, error } = await query;
+
+    if (error) {
+      console.error('Failed to pull remote check-ins:', error);
+      throw error;
+    }
+
+    if (!remoteData || remoteData.length === 0) {
+      isPulling = false;
+      return;
+    }
+
+    // Upsert remote data into SQLite
+    for (const remote of remoteData) {
+      const localRecord = {
+        id: remote.id,
+        userId: remote.user_id,
+        checkedAt: new Date(remote.checked_at),
+        emotions: remote.emotions,
+        context: remote.context,
+        note: remote.note,
+        entryMode: remote.entry_mode,
+        valenceScore: remote.valence_score,
+        arousalScore: remote.arousal_score,
+        bodyRegions: remote.body_regions,
+        reflection: remote.reflection,
+        syncStatus: 'synced' as const,
+        createdAt: new Date(remote.created_at),
+        updatedAt: new Date(remote.updated_at),
+      };
+
+      await db.insert(localCheckins).values(localRecord).onConflictDoUpdate({
+        target: localCheckins.id,
+        set: localRecord,
+      });
+    }
+
+  } catch (error) {
+    console.error('Error during pulling remote data:', error);
+  } finally {
+    isPulling = false;
+  }
 }
+
+/**
+ * Migrates 'local-anonymous' check-ins to a real authenticated user ID.
+ * Should be called right after a successful login/signup.
+ */
+export async function migrateAnonymousCheckins(newUserId: string): Promise<void> {
+  try {
+    const anonymousCheckins = await db
+      .select()
+      .from(localCheckins)
+      .where(eq(localCheckins.userId, 'local-anonymous'));
+
+    if (anonymousCheckins.length > 0) {
+      console.log(`Migrating ${anonymousCheckins.length} anonymous checkins to user ${newUserId}`);
+      
+      await db
+        .update(localCheckins)
+        .set({ userId: newUserId, syncStatus: 'pending', updatedAt: new Date() })
+        .where(eq(localCheckins.userId, 'local-anonymous'));
+      
+      // Trigger a sync immediately after migration
+      syncPendingCheckins().catch(console.error);
+    }
+  } catch (error) {
+    console.error('Failed to migrate anonymous check-ins:', error);
+  }
+}
+

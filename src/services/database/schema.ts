@@ -1,12 +1,6 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
-export const localProfiles = sqliteTable('local_profile', {
-  id: text('id').primaryKey(),
-  displayName: text('display_name'),
-  plan: text('plan').default('free'),
-  onboardingCompleted: integer('onboarding_completed', { mode: 'boolean' }).default(false),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }),
-});
+
 
 export const localCheckins = sqliteTable('local_checkins', {
   id: text('id').primaryKey(),

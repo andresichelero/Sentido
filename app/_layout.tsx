@@ -25,7 +25,11 @@ import * as Linking from 'expo-linking';
 
 import { supabase } from '../src/services/supabase/client';
 import { useUserStore } from '../src/stores/useUserStore';
-import { syncPendingCheckins } from '../src/services/database/sync';
+import {
+  syncPendingCheckins,
+  pullRemoteCheckins,
+  migrateAnonymousCheckins,
+} from '../src/services/database/sync';
 
 let Notifications: any = null;
 try {
@@ -107,6 +111,11 @@ export default function RootLayout() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session?.user?.id) {
+        migrateAnonymousCheckins(session.user.id).then(() => {
+          pullRemoteCheckins().catch(console.error);
+        });
+      }
     });
 
     // Deep link handler for Magic Links

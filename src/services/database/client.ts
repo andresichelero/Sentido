@@ -8,13 +8,7 @@ export const expoDb = openDatabaseSync('sentido.db', { enableChangeListener: tru
 expoDb.execSync(`
   PRAGMA journal_mode = WAL;
   
-  CREATE TABLE IF NOT EXISTS local_profile (
-    id TEXT PRIMARY KEY,
-    display_name TEXT,
-    plan TEXT DEFAULT 'free',
-    onboarding_completed INTEGER DEFAULT 0,
-    updated_at INTEGER
-  );
+
 
   CREATE TABLE IF NOT EXISTS local_checkins (
     id TEXT PRIMARY KEY,

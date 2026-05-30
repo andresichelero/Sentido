@@ -8,18 +8,19 @@ import { checkinsLocalDb } from '../services/database/checkins';
 import { getEmotionById } from '../utils/emotion-math';
 import type { Checkin } from '../types/checkin.types';
 
-const USER_ID = 'local-anonymous'; // Until auth (FASE 9)
+import { useUserStore } from '../stores/useUserStore';
 
 /** Get check-ins for the last N days */
 export function useCheckinHistory(days: number = 90) {
+  const userId = useUserStore((s) => s.session?.user?.id || 'local-anonymous');
   const from = new Date();
   from.setDate(from.getDate() - days);
   from.setHours(0, 0, 0, 0);
   const to = new Date();
 
   return useQuery({
-    queryKey: ['checkins', 'history', days],
-    queryFn: () => checkinsLocalDb.getCheckinsInRange(USER_ID, from, to),
+    queryKey: ['checkins', 'history', userId, days],
+    queryFn: () => checkinsLocalDb.getCheckinsInRange(userId, from, to),
     staleTime: 30_000, // 30s — refetch after new check-ins
   });
 }
@@ -148,16 +149,18 @@ function formatDateKey(date: Date): string {
 
 /** Get the current consecutive check-in streak */
 export function useUserStreak() {
+  const userId = useUserStore((s) => s.session?.user?.id || 'local-anonymous');
   return useQuery({
-    queryKey: ['checkins', 'streak'],
-    queryFn: () => checkinsLocalDb.getUserStreak(USER_ID),
+    queryKey: ['checkins', 'streak', userId],
+    queryFn: () => checkinsLocalDb.getUserStreak(userId),
   });
 }
 
 /** Get the total number of check-ins */
 export function useTotalCheckins() {
+  const userId = useUserStore((s) => s.session?.user?.id || 'local-anonymous');
   return useQuery({
-    queryKey: ['checkins', 'total'],
-    queryFn: () => checkinsLocalDb.getTotalCheckins(USER_ID),
+    queryKey: ['checkins', 'total', userId],
+    queryFn: () => checkinsLocalDb.getTotalCheckins(userId),
   });
 }
