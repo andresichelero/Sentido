@@ -63,6 +63,7 @@ export function BodyMapEntry() {
             mode="input"
             activeRegions={selectedRegions}
             onRegionPress={toggleRegion}
+            onClearRegions={clearRegions}
             accentColor={colors.activeEmotionColor}
           />
         </View>
@@ -110,14 +111,6 @@ export function BodyMapEntry() {
 
         {/* Actions */}
         <View style={styles.actions}>
-          {selectedRegions.length > 0 && (
-            <Button
-              label={language === 'en-US' ? 'Clear' : 'Limpar'}
-              variant="ghost"
-              size="sm"
-              onPress={clearRegions}
-            />
-          )}
           <Button
             label={`${language === 'en-US' ? 'Confirm selection' : 'Confirmar seleção'}${canConfirm ? ` (${selectedEmotionIds.length})` : ''}`}
             variant="primary"
